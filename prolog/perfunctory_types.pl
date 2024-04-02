@@ -93,10 +93,6 @@ vars_preserved(PreType, Type) :-
 
 term_vars_ord --> term_variables, list_to_ord_set.
 
-skeletal(Term) :-
-    Term =.. [_|Args],
-    maplist(var, Args).
-
 allowed_functor(Term), nonvar(Term) =>
     Term \= (_ -> _), % (->)/2 is reserved for function types.
     Term \= please_evaluate_me_to(_). % (\)/1 is reserved for cata escapes.
