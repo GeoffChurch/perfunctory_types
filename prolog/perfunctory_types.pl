@@ -60,9 +60,9 @@ normalize_(A, C) => get_possibly_cyclic_alias_canonical(A, C) *-> true ; C = A.
 
 cata(F, A, B) :-
     copy_term(A, A_),
-    rb_empty(Seen),
-    cata_(F, Seen, A_, B),
-    unescape(A_, A).
+    cata_(F, A_, B),
+    cata_(=, A_, A). % strip off escapes
+cata_(F) --> {rb_empty(Seen)}, cata_(F, Seen).
 cata_(_, _,    A,  B), var(A) => A = please_evaluate_me_to(B).
 cata_(_, _,   please_evaluate_me_to(B_), B) => B = B_.
 cata_(F, Seen, A,  B) =>
@@ -71,10 +71,6 @@ cata_(F, Seen, A,  B) =>
        call(F, C, B),
        mapargs(cata_(F, Seen1), A, C)
     ;  rb_lookup(A, B, Seen). % Tie the knot
-
-unescape(A, B) :-
-    rb_empty(Seen),
-    cata_(=, Seen, A, B).
 
 assert_type(Type, PreType) :-
     $(allowed_functor(PreType)),
