@@ -61,16 +61,16 @@ normalize_(A, C) => get_possibly_cyclic_alias_canonical(A, C) *-> true ; C = A.
 cata(F, A, B) :-
     copy_term(A, A_),
     cata_(F, A_, B),
-    cata_(=, A_, A). % strip off escapes
-cata_(F) --> {rb_empty(Seen)}, cata_(F, Seen).
-cata_(_, _,    A,  B), var(A) => A = please_evaluate_me_to(B).
-cata_(_, _,   please_evaluate_me_to(B_), B) => B = B_.
-cata_(F, Seen, A,  B) =>
-    rb_insert_new(Seen, A, B, Seen1)
-    -> same_functor(A, C), % Apply constraint early
+    cata_(=, A_, A). % unescape everything
+cata_(F) --> {rb_empty(Seen)}, cata__(F, Seen).
+cata__(_, _, A, B), var(A)  => A = \B. % escape
+cata__(_, _, A, B), A = \B_ => B = B_. % unescape
+cata__(F, S, A, B) =>
+    rb_insert_new(S, A, B, S1)
+    -> $(same_functor(A, C)), % Apply constraint early
        call(F, C, B),
-       mapargs(cata_(F, Seen1), A, C)
-    ;  rb_lookup(A, B, Seen). % Tie the knot
+       mapargs(cata__(F, S1), A, C)
+    ;  $(rb_lookup(A, B, S)). % Tie the knot
 
 assert_type(Type, PreType) :-
     $(allowed_functor(PreType)),
@@ -89,7 +89,7 @@ term_vars_ord --> term_variables, list_to_ord_set.
 
 allowed_functor(Term), nonvar(Term) =>
     Term \= (_ -> _), % (->)/2 is reserved for function types.
-    Term \= please_evaluate_me_to(_). % (\)/1 is reserved for cata escapes.
+    Term \= \_. % (\)/1 is reserved for cata escapes.
 
 declared_type(Type) :-
     $(same_functor(Type, Skel)), % This allows arity-overloaded types. TODO Maybe should be disallowed as is done for ctors.
