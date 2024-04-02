@@ -74,9 +74,7 @@ cata_(F, Seen, A,  B) =>
 
 unescape(A, B) :-
     rb_empty(Seen),
-    cata_(id, Seen, A, B).
-
-id(A, A).
+    cata_(=, Seen, A, B).
 
 assert_type(Type, PreType) :-
     $(allowed_functor(PreType)),
