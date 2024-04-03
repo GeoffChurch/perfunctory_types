@@ -54,22 +54,21 @@ type A == B =>
     $(normalize(B, C)),
     $(assert_possibly_cyclic_alias_canonical(A, C)).
 
-normalize(A, C) :- cata(normalize_, A, C).
+normalize(A, C) :-
+    copy_term(A, A_),
+    cata(normalize_, A_, C),
+    cata(=, A_, A). % unescape everything
 normalize_(A, C), A =@= (_ -> _) => C = A.
 normalize_(A, C) => get_possibly_cyclic_alias_canonical(A, C) *-> true ; C = A.
 
-cata(F, A, B) :-
-    copy_term(A, A_),
-    cata_(F, A_, B),
-    cata_(=, A_, A). % unescape everything
-cata_(F) --> {rb_empty(Seen)}, cata__(F, Seen).
-cata__(_, _, A, B), var(A)  => A = \B. % escape
-cata__(_, _, A, B), A = \B_ => B = B_. % unescape
-cata__(F, S, A, B) =>
+cata(F) --> {rb_empty(Seen)}, cata_(F, Seen).
+cata_(_, _, A, B), var(A)  => A = \B. % escape
+cata_(_, _, A, B), A = \B_ => B = B_. % unescape
+cata_(F, S, A, B) =>
     rb_insert_new(S, A, B, S1)
     -> $(same_functor(A, C)), % Apply constraint early
        call(F, C, B),
-       mapargs(cata__(F, S1), A, C)
+       mapargs(cata_(F, S1), A, C)
     ;  $(rb_lookup(A, B, S)). % Tie the knot
 
 assert_type(Type, PreType) :-
@@ -132,9 +131,8 @@ term_factorization(Term, Factorization), var(Factorization) =>
     ;  Factorization = acyclic(Term).
 
 typecheck(Term, Type) :-
-    $(copy_term(Term, Term_)),
     $(normalize(Type, CanonicalType)),
-    cata(typecheck_, Term_, CanonicalType).
+    cata(typecheck_, Term, CanonicalType).
 typecheck_(PreType, Type) =>
     % Try to look up the "full" type (if PreType is a function type then Type is too).
     functor(PreType, Ctor, _),
@@ -154,7 +152,7 @@ typecheck_(PreType, Type) =>
 matchargs(PartTerm, PartType, FullTerm, FullType) :-
     $(PartTerm =.. [F|PartArgs]),
     $(FullTerm =.. [F|FullArgs]),
-    append(PartArgs, RestArgs, FullArgs), % If RestArgs = [] then PartType = FullType.
+    $(append(PartArgs, RestArgs, FullArgs)), % If RestArgs = [] then PartType = FullType.
     % PartType should be a chain of arrows through each of RestArgs before ending at FullType
     arrow_list(PartType, RestArgs, FullType).
 

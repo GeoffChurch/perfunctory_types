@@ -25,7 +25,7 @@ test(setup_cleanup) :-
     retract_all_types,
     setup.
 
-test(var, [Var-Type =@= _-_]) :-
+test(var, [Var == \Type]) :-
     typecheck(Var, Type).
 
 test(incomplete_list, [Type =@= list(list(_))]) :-
@@ -67,6 +67,10 @@ test(var_alias_rhs, [error(determinism_error(nonvar(_), det, fail, goal), _)]) :
 test(var_alias_both, [error(determinism_error(nonvar(_), det, fail, goal), _)]) :-
     type X == X.
 
+test(too_many_args, [error(determinism_error(append(_,_,[nat]), det, fail, goal), _)]) :-
+    % TODO should have better error message than 'append(...)'
+    typecheck(s(z, z), _).
+
 test(arity_overloaded_type) :-
     % TODO: This is not necessarily desirable.
     % Overloading is already disallowed for term ctors so that currying always unambiguous.
@@ -93,7 +97,7 @@ test(unification_failure, [fail]) :-
 test(unification_skolem_success, [Type == refl(f)]) :-
     typecheck(f = f, Type).
 
-test(annotated_skolem_success, [X-Y-Type =@= _-_-list(f(_))]) :-
+test(annotated_skolem_success, [X-Y-Type =@= (\T)-(\T)-list(f(T))]) :-
     typecheck([f(X), f(Y)], Type).
 
 test(unification_skolem_failure, [fail]) :-
@@ -235,7 +239,7 @@ test(nat_arity, [Type == (nat_arity(natF(arity), arity), nat_arity(natF(arity), 
 	       nat_arity(s(even), odd),
 	       nat_arity(s(odd), even)), Type).
 
-test(fmapNat, [Type =@= (fmapNat((A->B->_),natF(A),natF(B)),fmapNat((X->Y->Z),natF(X),natF(Y)):-call((X->Y->Z),X,Y))]) :-
+test(fmapNat, [Type =@= (fmapNat((A->B->_),natF(A),natF(B)),fmapNat((Q->R->S),natF(Q),natF(R)):-call((Q->R->S),Q,R))]) :-
     typecheck((fmapNat(_, z, z),
 	       fmapNat(F, s(X), s(Y)) :- call(F, X, Y)), Type).
 
