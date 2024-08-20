@@ -2,13 +2,13 @@
 
 setup :-
     % Some type declarations
-    $(type refl(A) ---> A = A), % This could have just been a constraint (type ---> A = A), but refl(A) is more readable.
-    $(type         ---> unit),
+    $(type refl(A) ---> A = A), % This could have just been a constraint (type _ ---> A = A), but refl(A) is more readable.
+    $(type _       ---> unit),
     $(type nat     ---> z ; s(nat)),
-    $(type         ---> even(nat)),
+    $(type _       ---> even(nat)),
     $(type list(X) ---> [] ; [X|list(X)]),
-    $(type         ---> pair(_, _)), % This is an "arity constraint" so that pair(z) has type X -> pair(nat, X).
-    $(type         ---> call((A -> _), A)), % ctors can't be arity-overloaded, so we'd need e.g. call0, call1, etc.
+    $(type _       ---> pair(_, _)), % This is an "arity constraint" so that pair(z) has type X -> pair(nat, X).
+    $(type _       ---> call((A -> _), A)), % ctors can't be arity-overloaded, so we'd need e.g. call0, call1, etc.
 
     % Some type aliases
     $(StreamT = pair(X, StreamT)),
@@ -49,8 +49,8 @@ test(var_preservation, [error(determinism_error(vars_preserved(f(_), potato), de
 test(ctor_already_declared, [error(determinism_error(\+declared_ctor(z), det, fail, goal), _)]) :-
     type letter ---> z.
 
-test(var_type, [error(determinism_error(nonvar(_), det, fail, goal), _)]) :-
-    type _ ---> potato.
+test(var_type, [Type == abcd(X,Y,Z)]) :-
+    type Type ---> a(X) ; b(X,Y) ; c(Z) ; d.
 
 test(var_ctor, [error(determinism_error(nonvar(_), det, fail, goal), _)]) :-
     (type potato ---> _).
@@ -80,7 +80,7 @@ test(type_as_term, [error(determinism_error(\+declared_type(nat), det, fail, goa
     typecheck([nat], _).
 
 test(type_as_ctor, [error(determinism_error(\+declared_type(nat), det, fail, goal), _)]) :-
-    type ---> nat.
+    type _ ---> nat.
 
 test(disallowed_type_functor, [error(determinism_error(allowed_functor(_->_), det, fail, goal), _)]) :-
     type arrow(A, B) ---> (A -> B).
@@ -229,9 +229,9 @@ specialized_cata_setup :-
     NatT = natF(NatT),
     (type nat == NatT),
     (type arity ---> even ; odd),
-    (type ---> nat_arity(natF(arity), arity)),
-    (type ---> fmapNat((A -> B -> _), natF(A), natF(B))),
-    (type ---> cataNat((natF(A) -> A -> _), nat, A)).
+    (type _ ---> nat_arity(natF(arity), arity)),
+    (type _ ---> fmapNat((A -> B -> _), natF(A), natF(B))),
+    (type _ ---> cataNat((natF(A) -> A -> _), nat, A)).
 
 test(nat_arity, [Type == (nat_arity, nat_arity, nat_arity)]) :-
     typecheck((nat_arity(z, even),
