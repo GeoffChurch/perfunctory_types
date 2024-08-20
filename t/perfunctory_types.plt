@@ -6,7 +6,6 @@ setup :-
     $(type         ---> unit),
     $(type nat     ---> z ; s(nat)),
     $(type         ---> even(nat)),
-    $(type         ---> red ; green ; blue),
     $(type list(X) ---> [] ; [X|list(X)]),
     $(type         ---> pair(_, _)), % This is an "arity constraint" so that pair(z) has type X -> pair(nat, X).
     $(type         ---> call((A -> _), A)), % ctors can't be arity-overloaded, so we'd need e.g. call0, call1, etc.
@@ -36,13 +35,13 @@ test(complete_list, [Type == list(list(nat))]) :-
     typecheck([[],[s(s(z))]], Type).
 
 test(heterogeneous_list, [fail]) :-
-    typecheck([[z],[red]], _).
+    typecheck([[z],[[]]], _).
 
 test(whole_program, [Type == (nat, (nat     :- nat ), even,      (even          :- even))]) :-
     typecheck(               (z,   (s(s(N)) :- s(N)), even(z),   (even(s(s(N))) :- even(N))), Type).
 
 test(typecheck_fail_propagates, [fail]) :-
-    typecheck([even(red)], _).
+    typecheck([even([])], _).
 
 test(var_preservation, [error(determinism_error(vars_preserved(f(_), potato), det, fail, goal), _)]) :-
     type potato ---> f(_).
@@ -93,7 +92,7 @@ test(unification_success, [Type == refl(nat)]) :-
     typecheck(z = s(z), Type).
 
 test(unification_failure, [fail]) :-
-    typecheck(z = red, _).
+    typecheck(z = [], _).
 
 test(unification_skolem_success, [Type == refl(f)]) :-
     typecheck(f = f, Type).
@@ -102,10 +101,10 @@ test(annotated_skolem_success, [X-Y-Type =@= (\T)-(\T)-list(f(T))]) :-
     typecheck([f(X), f(Y)], Type).
 
 test(unification_skolem_failure, [fail]) :-
-    typecheck(f(z) = f(red), _).
+    typecheck(f(z) = f([]), _).
 
 test(annotated_skolem_failure, [fail]) :-
-    typecheck([f(z), f(red)], _).
+    typecheck([f(z), f([])], _).
 
 test(ho_multi, [Type =@= (X->list(X)->list(X))]) :-
     typecheck('[|]', Type).
@@ -115,7 +114,7 @@ test(ho_curry, [Type =@= (list(list(X))->list(list(X)))]) :-
 
 test(call, [Type == call(nat, nat)]) :-
     typecheck(call(s, s(z)), Type),
-    \+ typecheck(call(s, red), _).
+    \+ typecheck(call(s, []), _).
 
 test(alias_when_requested, [ListNat == list(nat)]) :-
     typecheck(pair([z], _), stream(ListNat)).
@@ -123,8 +122,8 @@ test(alias_when_requested, [ListNat == list(nat)]) :-
 test(no_alias_when_not_requested, [Type =@= pair(list(nat), _)]) :-
     typecheck(pair([z], _), Type).
 
-test(failure_propagates_through_alias, [fail]) :- % red is a color, not a nat
-    typecheck(pair([red], _), stream(list(nat))).
+test(failure_propagates_through_alias, [fail]) :- % [] is not a nat
+    typecheck(pair([[]], _), stream(list(nat))).
 
 test(nested_alias) :-
     typecheck(pair(pair(_,_),_), stream(stream(_))).
@@ -199,21 +198,21 @@ test(rectype_curry_var_both, [Type =@= (stream(X) -> stream(X))]) :-
     typecheck(pair(_), Type).
 
 test(internal_skolemize_to_recursive_type) :-
-    \+ typecheck((X = g(X), f(red) = f(X)), _),
-    \+ typecheck((X = g(X), f(X) = f(red)), _),
-    \+ typecheck((f(red) = f(X), X = g(X)), _),
-    \+ typecheck((f(X) = f(red), X = g(X)), _).
+    \+ typecheck((X = g(X), f(z) = f(X)), _),
+    \+ typecheck((X = g(X), f(X) = f(z)), _),
+    \+ typecheck((f(z) = f(X), X = g(X)), _),
+    \+ typecheck((f(X) = f(z), X = g(X)), _).
 
 test(internal_recursive_term_type_deduced, [Type==(refl(list(unit)),refl(f(list(unit))))]) :-
     typecheck((X = [_|X], f([unit]) = f(X)), Type).
 
 test(external_skolemize_to_recursive_type_fail_first) :-
     X = g(X),
-    \+ typecheck((f(red) = f(X), X), _).
+    \+ typecheck((f(z) = f(X), X), _).
 
 test(external_skolemize_to_recursive_type_fail_second) :- % This requires cycle safety.
     X = g(X),
-    \+ typecheck((X, f(red) = f(X)), _).
+    \+ typecheck((X, f(z) = f(X)), _).
 
 test(recursive_type_terminates) :-
     Stream = pair(_, Stream),
