@@ -23,25 +23,44 @@
 	      retract_all_types/0
 	  ]).
 
-:- dynamic ctor_pretype_type/3. % Type definitions, e.g. ctor_pretype_type(s, s(nat), nat).
-:- dynamic alias_canonical/2. % Type aliases, e.g. alias_canonical(intlist, list(int)).
+:- autoload(library(apply), [maplist/2, maplist/4, foldl/4]).
+:- autoload(library(lists), [reverse/2, append/3]).
+:- autoload(library(ordsets), [ord_subset/2, list_to_ord_set/2]).
+:- autoload(library(prolog_code), [semicolon_list/2]).
+:- autoload(library(rbtrees), [rb_empty/1, rb_insert_new/4,
+			       rb_lookup/3]).
+:- autoload(library(terms), [same_functor/2, mapargs/3,
+			     term_factorized/3]).
+
+:- dynamic ctor_pretype_type/3. % Type definitions.
+:- dynamic alias_canonical/2. % Type aliases.
 
 :- det((type)/1).
 
-% Declare a new type. `PreTypes` should be a semicolon-delimited list of terms whose arguments are types.
+% Declare a new type. `PreTypes` should be a semicolon-delimited list
+% of terms whose arguments are types.
 type Type ---> PreTypes =>
     $(nonvar(Type)),
     $(nonvar(PreTypes)), % This ensures semicolon_list is det.
     $(allowed_functor(Type)),
     $(\+ declared_type(Type)), % Guardrail: single-definition.
-    $(\+ declared_ctor(Type)), % Guardrail: types can't be ctors of other types.
+    $(\+ declared_ctor(Type)), % Guardrail: not ctor of other type.
     $(vars_preserved(PreTypes, Type)),
     $(semicolon_list(PreTypes, PreTypeList)),
     $(normalize(Type, NT)),
     maplist(assert_type(NT), PreTypeList).
 
-% If the derived type is omitted it will default to be the same as the ctor. This can be done in order to constrain a ctor's arity or argument types without needing to come up with a name for the derived type.
-type ---> PreType => type PreType ---> PreType.
+% If the derived type is omitted it will be given a default type whose
+% functor is the concatenation of the functors of the PreTypes and
+% whose parameters are their variables.
+type ---> PreTypes =>
+    $(nonvar(PreTypes)),
+    $(call_dcg((semicolon_list, reverse), PreTypes, PreTypeList)),
+    $(maplist(functor, PreTypeList, Functors, _Arities)),
+    foldl(atom_concat, Functors, '', TypeName),
+    term_variables(PreTypes, Vars),
+    Type =.. [TypeName|Vars],
+    (type Type ---> PreTypes).
 
 % Declare `A` as an alias of `B`.
 type A == B =>
@@ -50,35 +69,51 @@ type A == B =>
     $(allowed_functor(A)),
     $(\+ declared_type(A)),
     $(\+ declared_ctor(A)),
-    $(vars_preserved(B, A)), % This allows phantom types
+    % In order to allow phantom types, just require subset rather than
+    % full equality.
+    $(vars_preserved(B, A)),
     $(normalize(B, C)),
     $(assert_possibly_cyclic_alias_canonical(A, C)).
+
+
+:- meta_predicate cata(2, ?, ?).
+cata(F) --> {rb_empty(Seen)}, cata_(F, Seen).
+
+:- meta_predicate cata_(2, +, ?, ?).
+cata_(_, _, A, B), var(A)  => A = \B. % Escape.
+cata_(_, _, A, B), A = \B_ => B = B_. % Unescape.
+cata_(F, S, A, B) =>
+    rb_insert_new(S, A, B, S1)
+    -> $(same_functor(A, C)), % Apply constraint early.
+       call(F, C, B),
+       mapargs(cata_(F, S1), A, C)
+    ;  $(rb_lookup(A, B, S)). % Tie the knot.
 
 normalize(A, C) :-
     copy_term(A, A_),
     cata(normalize_, A_, C),
-    cata(=, A_, A). % unescape everything
-normalize_(A, C), A =@= (_ -> _) => C = A.
-normalize_(A, C) => get_possibly_cyclic_alias_canonical(A, C) *-> true ; C = A.
+    cata(=, A_, A). % Unescape everything.
 
-cata(F) --> {rb_empty(Seen)}, cata_(F, Seen).
-cata_(_, _, A, B), var(A)  => A = \B. % escape
-cata_(_, _, A, B), A = \B_ => B = B_. % unescape
-cata_(F, S, A, B) =>
-    rb_insert_new(S, A, B, S1)
-    -> $(same_functor(A, C)), % Apply constraint early
-       call(F, C, B),
-       mapargs(cata_(F, S1), A, C)
-    ;  $(rb_lookup(A, B, S)). % Tie the knot
+normalize_(A, C), A =@= (_ -> _) => C = A.
+normalize_(A, C) =>
+    get_possibly_cyclic_alias_canonical(A, C)
+    *-> true
+    ;   C = A.
 
 assert_type(Type, PreType) :-
     $(allowed_functor(PreType)),
-    $(\+ declared_ctor(PreType)), % If a ctor could appear in distinct type declarations it would require linear space and exponential time to find the right type.
-    $(mapargs(normalize, PreType, NPT)), % Normalize arguments. This could just be normalize(PreType, NPT).
+    % If a ctor could appear in distinct type declarations it would
+    % require linear space and exponential time to find the right
+    % type.
+    $(\+ declared_ctor(PreType)),
+    % Normalize arguments. This could just be normalize(PreType, NPT).
+    $(mapargs(normalize, PreType, NPT)),
     $(functor(NPT, Ctor, _)),
-    $(assert_possibly_cyclic_type(Ctor, NPT, Type)). % As of SWI 9.0.4, cyclic terms cannot be directly asserted.
+    % As of SWI 9.2.6, cyclic terms cannot be directly asserted.
+    $(assert_possibly_cyclic_type(Ctor, NPT, Type)).
 
-% See https://www.cs.cmu.edu/~fp/courses/lp/lectures/10-poly.pdf (type preservation).
+% See https://www.cs.cmu.edu/~fp/courses/lp/lectures/10-poly.pdf (type
+% preservation).
 vars_preserved(PreType, Type) :-
     term_vars_ord(PreType, PTVs),
     term_vars_ord(Type, TVs),
@@ -91,8 +126,11 @@ allowed_functor(Term), nonvar(Term) =>
     Term \= \_. % (\)/1 is reserved for cata escapes.
 
 declared_type(Type) :-
-    $(same_functor(Type, Skel)), % This allows arity-overloaded types. TODO Maybe should be disallowed as is done for ctors.
-    (get_possibly_cyclic_type(_, _, Skel) ; alias_canonical(Skel, _)), !.
+    % This allows arity-overloaded types. TODO maybe should be
+    % disallowed as is done for ctors.
+    $(same_functor(Type, Skel)),
+    (get_possibly_cyclic_type(_, _, Skel); alias_canonical(Skel, _)),
+    !.
 
 declared_ctor(PreType) :-
     $(functor(PreType, Ctor, _)),
@@ -116,7 +154,7 @@ get_possibly_cyclic_alias_canonical(A, C) :-
     alias_canonical(A, Factorization),
     term_factorization(C, Factorization).
 
-retract_all_types :-
+retract_all_types :- % TODO this isn't module-aware.
     retractall(ctor_pretype_type(_, _, _)),
     retractall(alias_canonical(_, _)).
 
@@ -134,27 +172,36 @@ typecheck(Term, Type) :-
     $(normalize(Type, CanonicalType)),
     cata(typecheck_, Term, CanonicalType).
 typecheck_(PreType, Type) =>
-    % Try to look up the "full" type (if PreType is a function type then Type is too).
+    % Try to look up the "full" type (if PreType is a function type
+    % then Type is too).
     functor(PreType, Ctor, _),
     get_possibly_cyclic_type(Ctor, FullPreType, FullType)
-    *-> % Resolve Type to FullType, possibly prefixed with arrows if missing arguments.
+    *-> % Resolve Type to FullType, possibly prefixed with arrows if
+	% missing arguments.
 	matchargs(PreType, Type, FullPreType, FullType)
     ;   % Otherwise, do an ad-hoc type declaration/skolemization.
-	% This is similar to having declared
-	% `same_functor(PreType, Skel), (type Skel ---> Skel)` ahead of time, so that
-	% PreType is polymorphic in all arguments and has a unique type (the difference
-        % is that the declaration would constrain the arity). In other words,
-	% the ambient algebra is left free except where it has been explicitly
-	% coalesced by declaring types with multiple ctors.
-        $(\+ declared_type(PreType)), % Block skolemization when the term is a type, so that we can't inject into a type with the same functor as PreType.
+	% This is similar to having declared `same_functor(PreType,
+	% Skel), (type Skel ---> Skel)` ahead of time, so that PreType
+	% is polymorphic in all arguments and has a unique type (the
+	% difference is that the declaration would constrain the
+	% arity). In other words, the ambient algebra is left free
+	% except where it has been explicitly coalesced by declaring
+	% types with multiple ctors.
+
+        % Block skolemization when the term is a type, so that we
+        % can't inject into a type with the same functor as PreType.
+        $(\+ declared_type(PreType)),
 	Type = PreType. % Skolemize.
 
 matchargs(PartTerm, PartType, FullTerm, FullType) :-
     $(PartTerm =.. [F|PartArgs]),
     $(FullTerm =.. [F|FullArgs]),
-    $(append(PartArgs, RestArgs, FullArgs)), % If RestArgs = [] then PartType = FullType.
-    % PartType should be a chain of arrows through each of RestArgs before ending at FullType
+    % If RestArgs = [] then PartType = FullType.
+    $(append(PartArgs, RestArgs, FullArgs)),
+    % PartType should be a chain of arrows through each of RestArgs
+    % before ending at FullType.
     arrow_list(PartType, RestArgs, FullType).
 
 arrow_list(FullType, [], FullType).
-arrow_list(X->Arrows, [X|List], RestArrows) :- arrow_list(Arrows, List, RestArrows).
+arrow_list(X->Arrows, [X|List], RestArrows) :-
+    arrow_list(Arrows, List, RestArrows).
