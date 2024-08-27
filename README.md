@@ -1,10 +1,10 @@
 # `perfunctory_types`
 
-`perfunctory_types` is a static type system for SWI Prolog.
+`perfunctory_types` is a static type system for SWI-Prolog.
 
 It might be bugged or at least irreparably flawed. Feedback is very welcome!
 
-See [the tests](t/perfunctory_types.plt) for lots of examples.
+See [the tests](t/) for lots of examples.
 
 ## Overview
 
@@ -12,9 +12,9 @@ The basic idea is that type declarations constrain and coalesce the ambient "ter
 
 The algebra is constrained into a subalgebra by constraining the types of a constructor's arguments.
 
-The algebra is coalesced into a quotient algebra by declaring types with multiple constructors. This is in some sense secondary to constraints but it enables finite expression of nontrivial type algebras.
+The algebra is coalesced into a quotient algebra by declaring types with multiple constructors.
 
-Typechecking amounts to checking that a term is a member of the subalgebra induced by the type constraints.
+Typechecking amounts to checking that a term is a member of the algebra induced by the type constraints.
 
 
 ## Salient aspects
@@ -101,24 +101,23 @@ Typechecking is applied to terms, which may be entire programs. Types are "per-f
 
 ## TODOs
 
+### Semantic checking
+
+Right now, type checking is "syntactic" in that it applies to terms and is completely unaware of predicates. More powerful semantic checking will be added soon, and will amount to inferring the type of a predicate's head functor as the unification of its per-clause head types.
+
 ### Higher-kinded types
 
 There don't appear to be any technical blockers. Hopefully the [`hilog`](https://us.swi-prolog.org/pack/list?p=hilog) pack can do the heavy-lifting.
 
 ### Tooling integration
 
-Right now, type checking must be done manually with `typecheck/2`.
+Some options are:
 
 [`style_check/1`](https://www.swi-prolog.org/pldoc/man?predicate=style_check/1)
 
 [`lsp_server`](https://www.swi-prolog.org/pack/list?p=lsp_server)
 
 [`prolog_lsp`](https://www.swi-prolog.org/pack/list?p=prolog_lsp)
-
-### Module-awareness
-
-Type declarations currently just `assertz` into the database, and can be retracted with `retract_all_types/0`. This is hacky and has no awareness of modules. What is the best way to do this?
-
 
 ## Installation in SWI-Prolog
 
@@ -129,11 +128,8 @@ Type declarations currently just `assertz` into the database, and can be retract
 ## Testing
 
 ```shell
-$ swipl t/perfunctory_types.plt 
-swipl t/perfunctory_types.plt 
-% PL-Unit: perfunctory_types ...................................................... passed 0.016 sec
-% PL-Unit: examples .... passed 0.001 sec
-% All 58 tests passed
+$ cd t/
+$ swipl -g "consult('*.plt'), run_tests" -t halt
 ```
 
 ---

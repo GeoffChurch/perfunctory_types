@@ -1,4 +1,4 @@
-:- use_module("../prolog/perfunctory_types").
+:- use_module("../prolog/core").
 
 setup :-
     % Some type declarations
@@ -17,12 +17,15 @@ setup :-
     $(type succ_alias      == (nat -> nat)),
     $(type cons_alias(X)   == (list(X) -> list(X))).
 
-:- begin_tests(perfunctory_types, [setup(setup), cleanup(retract_all_types)]).
+catch_error(Goal, E) :-
+    catch(Goal, error(E, _), true).
+
+:- begin_tests(basic, [setup(setup), cleanup(retract_all_types_and_aliases)]).
 
 test(setup_cleanup) :-
-    retract_all_types,
+    retract_all_types_and_aliases,
     setup,
-    retract_all_types,
+    retract_all_types_and_aliases,
     setup.
 
 test(var, [Var == \Type]) :-
@@ -34,14 +37,14 @@ test(incomplete_list, [Type =@= list(list(_))]) :-
 test(complete_list, [Type == list(list(nat))]) :-
     typecheck([[],[s(s(z))]], Type).
 
-test(heterogeneous_list, [fail]) :-
-    typecheck([[z],[[]]], _).
+test(heterogeneous_list, [E =@= ill_typed(expected_type(list(_)),got(nat))]) :-
+    catch_error(typecheck([[z],[[]]], _), E).
 
 test(whole_program, [Type == (nat, (nat     :- nat ), even,      (even          :- even))]) :-
     typecheck(               (z,   (s(s(N)) :- s(N)), even(z),   (even(s(s(N))) :- even(N))), Type).
 
-test(typecheck_fail_propagates, [fail]) :-
-    typecheck([even([])], _).
+test(typecheck_fail_propagates, [E =@= ill_typed(expected_type(list(_)),got(nat))]) :-
+    catch_error(typecheck([even([])], _), E).
 
 test(var_preservation, [error(determinism_error(vars_preserved(f(_), potato), det, fail, goal), _)]) :-
     type potato ---> f(_).
@@ -67,9 +70,8 @@ test(var_alias_rhs, [error(determinism_error(nonvar(_), det, fail, goal), _)]) :
 test(var_alias_both, [error(determinism_error(nonvar(_), det, fail, goal), _)]) :-
     type X == X.
 
-test(too_many_args, [error(determinism_error(append(_,_,[nat]), det, fail, goal), _)]) :-
-    % TODO should have better error message than 'append(...)'
-    typecheck(s(z, z), _).
+test(too_many_args, [E =@= ill_typed(expected(s(nat)),got(s(_, _)))]) :-
+    catch_error(typecheck(s(z, z), _), E).
 
 test(arity_overloaded_type) :-
     % TODO: This is not necessarily desirable.
@@ -91,8 +93,8 @@ test(disallowed_ctor_functor, [error(determinism_error(allowed_functor(_->_), de
 test(unification_success, [Type == refl(nat)]) :-
     typecheck(z = s(z), Type).
 
-test(unification_failure, [fail]) :-
-    typecheck(z = [], _).
+test(unification_failure, [E =@= ill_typed(expected_type(list(_)),got(nat))]) :-
+    catch_error(typecheck(z = [], _), E).
 
 test(unification_skolem_success, [Type == refl(f)]) :-
     typecheck(f = f, Type).
@@ -100,11 +102,11 @@ test(unification_skolem_success, [Type == refl(f)]) :-
 test(annotated_skolem_success, [X-Y-Type =@= (\T)-(\T)-list(f(T))]) :-
     typecheck([f(X), f(Y)], Type).
 
-test(unification_skolem_failure, [fail]) :-
-    typecheck(f(z) = f([]), _).
+test(unification_skolem_failure, [E =@= ill_typed(expected_type(list(_)),got(nat))]) :-
+    catch_error(typecheck(f(z) = f([]), _), E).
 
-test(annotated_skolem_failure, [fail]) :-
-    typecheck([f(z), f([])], _).
+test(annotated_skolem_failure, [E =@= ill_typed(expected_type(list(_)),got(nat))]) :-
+    catch_error(typecheck([f(z), f([])], _), E).
 
 test(ho_multi, [Type =@= (X->list(X)->list(X))]) :-
     typecheck('[|]', Type).
@@ -112,9 +114,11 @@ test(ho_multi, [Type =@= (X->list(X)->list(X))]) :-
 test(ho_curry, [Type =@= (list(list(X))->list(list(X)))]) :-
     typecheck('[|]'([]), Type).
 
-test(call, [Type == call(nat, nat)]) :-
-    typecheck(call(s, s(z)), Type),
-    \+ typecheck(call(s, []), _).
+test(call_success, [Type == call(nat, nat)]) :-
+    typecheck(call(s, s(z)), Type).
+
+test(call_failure, [E =@= ill_typed(expected_type(list(_)),got(nat))]) :-
+    catch_error(typecheck(call(s, []), _), E).
 
 test(alias_when_requested, [ListNat == list(nat)]) :-
     typecheck(pair([z], _), stream(ListNat)).
@@ -122,8 +126,8 @@ test(alias_when_requested, [ListNat == list(nat)]) :-
 test(no_alias_when_not_requested, [Type =@= pair(list(nat), _)]) :-
     typecheck(pair([z], _), Type).
 
-test(failure_propagates_through_alias, [fail]) :- % [] is not a nat
-    typecheck(pair([[]], _), stream(list(nat))).
+test(failure_propagates_through_alias, [E =@= ill_typed(expected_type(list(_)),got(nat))]) :-
+    catch_error(typecheck(pair([[]], _), stream(list(nat))), E).
 
 test(nested_alias) :-
     typecheck(pair(pair(_,_),_), stream(stream(_))).
@@ -134,8 +138,9 @@ test(nested_alias_collapse) :-
 test(function_alias, [Nat == nat]) :-
     typecheck('[|]'(z), cons_alias(Nat)).
 
-test(failed_alias, [fail]) :- % z is a nat, not a stream.
-    typecheck(pair(_, z), stream(_)).
+test(failed_alias, [E =@= ill_typed(expected_type(nat),got(Stream))]) :-
+    Stream = pair(_, Stream),
+    catch_error(typecheck(pair(_, z), stream(_)), E).
 
 test(argument_of_alias_inferred, [Nat == nat]) :-
     typecheck(pair(z, _), stream(Nat)).
@@ -197,32 +202,38 @@ test(rectype_curry_var_both, [Type =@= (stream(X) -> stream(X))]) :-
     Type = (stream(_) -> stream(_)),
     typecheck(pair(_), Type).
 
-test(internal_skolemize_to_recursive_type) :-
-    \+ typecheck((X = g(X), f(z) = f(X)), _),
-    \+ typecheck((X = g(X), f(X) = f(z)), _),
-    \+ typecheck((f(z) = f(X), X = g(X)), _),
-    \+ typecheck((f(X) = f(z), X = g(X)), _).
+test(internal_skolemize_to_recursive_type1, [E == ill_typed(expected_type(G),got_type(nat))]) :-
+    G = g(G),
+    catch_error(typecheck((X = g(X), f(z) = f(X)), _), E).
+
+test(internal_skolemize_to_recursive_type2, [E == ill_typed(expected_type(nat),got(G))]) :-
+    G = g(G),
+    catch_error(typecheck((X = g(X), f(X) = f(z)), _), E).
+
+test(internal_skolemize_to_recursive_type3, [E =@= ill_typed(expected_type(nat),got_untyped_term(g(_)))]) :-
+    catch_error(typecheck((f(z) = f(X), X = g(X)), _), E).
+
+test(internal_skolemize_to_recursive_type4, [E =@= ill_typed(expected_type(nat),got_untyped_term(g(_)))]) :-
+    catch_error(typecheck((f(X) = f(z), X = g(X)), _), E).
 
 test(internal_recursive_term_type_deduced, [Type==(refl(list(unit)),refl(f(list(unit))))]) :-
     typecheck((X = [_|X], f([unit]) = f(X)), Type).
 
-test(external_skolemize_to_recursive_type_fail_first) :-
+test(external_skolemize_to_recursive_type_fail_first, [E =@= ill_typed(expected_type(nat),got_untyped_term(g(_)))]) :-
     X = g(X),
-    \+ typecheck((f(z) = f(X), X), _).
+    catch_error(typecheck((f(z) = f(X), X), _), E).
 
-test(external_skolemize_to_recursive_type_fail_second) :- % This requires cycle safety.
+test(external_skolemize_to_recursive_type_fail_second, [E =@= ill_typed(expected_type(nat),got_untyped_term(g(_)))]) :- % This requires cycle safety.
     X = g(X),
-    \+ typecheck((X, f(z) = f(X)), _).
+    catch_error(typecheck((X, f(z) = f(X)), _), E).
 
 test(recursive_type_terminates) :-
     Stream = pair(_, Stream),
     typecheck(_, Stream).
 
-:- end_tests(perfunctory_types).
+:- end_tests(basic).
 
-:- begin_tests(examples, [setup(specialized_cata_setup)
-			  , cleanup(retract_all_types)
-			 ]).
+:- begin_tests(cata, [setup(specialized_cata_setup), cleanup(retract_all_types_and_aliases)]).
 
 specialized_cata_setup :-
     (type natF(A) ---> z ; s(A)),
@@ -250,7 +261,4 @@ test(cataNat_aliased, [Type =@= (cataNat(CoD,AlgT):-fmapNat(nat,CoD,cataNat(CoD,
     Type = (_:-fmapNat(nat,_,_),_), % Force natF(natF(...)) to be aliased to nat.
     typecheck((cataNat(Alg, A, B) :- fmapNat(cataNat(Alg), A, B0), call(Alg, B0, B)), Type).
 
-:- end_tests(examples).
-
-:- run_tests.
-
+:- end_tests(cata).

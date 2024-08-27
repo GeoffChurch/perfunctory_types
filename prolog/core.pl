@@ -19,7 +19,9 @@
 	      op(1130, xfx, --->),
 	      (type)/1,
 	      typecheck/2,
-	      retract_all_types/0
+	      current_ctor/3,
+	      retract_ctor/3,
+	      retract_all_types_and_aliases/0
 	  ]).
 
 :- autoload(library(apply), [maplist/2, maplist/4, foldl/4]).
@@ -75,8 +77,8 @@ type A == B =>
 cata(F) --> { rb_empty(Seen) }, cata_(F, Seen).
 
 :- meta_predicate cata_(2, +, ?, ?).
-cata_(_, _, A, B), var(A)  => A = \B. % Escape.
-cata_(_, _, A, B), A = \B_ => B = B_. % Unescape.
+cata_(_, _, A, B), var(A)  => $(A = \B). % Escape.
+cata_(_, _, A, B), A = \B_ => $(B = B_). % Unescape.
 cata_(F, S, A, B) =>
     rb_insert_new(S, A, B, S1)
     -> $(same_functor(A, C)), % Apply constraint early.
@@ -130,13 +132,11 @@ declared_ctor(PreType) :-
 
 cyclesafe_assert_type(Ctor, PreType, Type) :-
     term_factorization(PreType, PTF),
-    term_factorization(Type, TF),
-    assertz(ctor_pretype_type(Ctor, PTF, TF)).
+    assertz(ctor_pretype_type(Ctor, PTF, Type)).
 
 cyclesafe_type(Ctor, PreType, Type) :-
-    ctor_pretype_type(Ctor, PTF, TF),
-    term_factorization(PreType, PTF),
-    term_factorization(Type, TF).
+    ctor_pretype_type(Ctor, PTF, Type),
+    term_factorization(PreType, PTF).
 
 cyclesafe_assert_alias_canonical(A, C) :-
     term_factorization(C, Factorization),
@@ -146,7 +146,22 @@ cyclesafe_alias_canonical(A, C) :-
     alias_canonical(A, Factorization),
     term_factorization(C, Factorization).
 
-retract_all_types :- % TODO this isn't module-aware.
+current_ctor(Name, Arity, Type) :-
+    ctor_pretype_type(Name, PreType, Type),
+    functor(PreType, Name, Arity).
+
+retract_ctor(Name, Arity, Type) :-
+    ctor_pretype_type(Name, PreType, Type),
+    $(functor(PreType, Name, Arity)),
+    $(retract(ctor_pretype_type(Name, PreType, Type))),
+    (ctor_pretype_type(_, _, Type)
+    -> true
+    ;  retractall(alias_canonical(Type, _)),
+       retractall(alias_canonical(_, Type))).
+
+retract_all_types_and_aliases :-
+    % forall(current_ctor(Name, Arity, Type),
+    %        retract_ctor(Name, Arity, Type)).
     retractall(ctor_pretype_type(_, _, _)),
     retractall(alias_canonical(_, _)).
 
@@ -160,9 +175,17 @@ term_factorization(Term, Factorization), var(Factorization) =>
        Factorization = skel_subst(Skel, Subst)
     ;  Factorization = acyclic(Term).
 
+:- det(typecheck/2).
+
 typecheck(Term, Type) :-
     $(dealias(Type, CanonicalType)),
-    cata(typecheck_, Term, CanonicalType).
+    catch(cata(typecheck_, Term, CanonicalType),
+	  error(determinism_error(PT=T,det,fail,goal), Ctx),
+	  throw(error(ill_typed(
+			  expected_type(T),
+			  got_type(PT)
+		      ), Ctx))).
+
 typecheck_(PreType, Type) =>
     % Try to look up the "full" type (if PreType is a function type
     % then Type is too).
@@ -170,29 +193,42 @@ typecheck_(PreType, Type) =>
     cyclesafe_type(Ctor, FullPreType, FullType)
     *-> % Resolve Type to FullType, possibly prefixed with arrows if
 	% missing arguments.
-	matchargs(PreType, Type, FullPreType, FullType)
+	$(matchargs(PreType, Type, FullPreType, FullType))
     ;   % Otherwise, do an ad-hoc type declaration/skolemization.
 	% This is similar to having declared `same_functor(PreType,
 	% Skel), (type Skel ---> Skel)` ahead of time, so that PreType
 	% is polymorphic in all arguments and has a unique type (the
-	% difference is that the declaration would constrain the
-	% arity). In other words, the ambient algebra is left free
+	% difference is that an explicit declaration would constrain
+	% the arity). In other words, the ambient algebra is left free
 	% except where it has been explicitly coalesced by declaring
 	% types with multiple ctors.
 
         % Block skolemization when the term is a type, so that we
         % can't inject into a type with the same functor as PreType.
         $(\+ declared_type(PreType)),
-	Type = PreType. % Skolemize.
+	(Type = PreType % Skolemize.
+	-> true
+	;  throw(error(
+		     ill_typed(
+			 expected_type(Type),
+			 got_untyped_term(PreType)), _))).
 
 matchargs(PartTerm, PartType, FullTerm, FullType) :-
     $(PartTerm =.. [F|PartArgs]),
     $(FullTerm =.. [F|FullArgs]),
     % If RestArgs = [] then PartType = FullType.
-    $(append(PartArgs, RestArgs, FullArgs)),
+    (append(PartArgs, RestArgs, FullArgs)
+    *-> true
+    ;  throw(error(ill_typed(
+		       expected(FullTerm),
+		       got(PartTerm)), _))),
     % PartType should be a chain of arrows through each of RestArgs
     % before ending at FullType.
-    arrow_list(PartType, RestArgs, FullType).
+    (arrow_list(PartType, RestArgs, FullType)
+    *-> true
+    ;   throw(error(ill_typed(
+			expected_type(FullType),
+			got(PartType)), _))).
 
 arrow_list(FullType, [], FullType).
 arrow_list(X->Arrows, [X|List], RestArrows) :-
