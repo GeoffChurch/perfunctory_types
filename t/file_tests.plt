@@ -1,4 +1,4 @@
-:- use_module("../prolog/core").
+:- use_module("../prolog/declaration").
 
 :- dynamic error_happened/1.
 

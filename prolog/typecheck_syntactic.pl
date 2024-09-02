@@ -1,6 +1,6 @@
 :- module(typecheck_syntactic, []).
 
-:- reexport("core").
+:- reexport("declaration").
 
 :- dynamic term_to_check/1.
 

@@ -1,4 +1,4 @@
-:- use_module("../prolog/core").
+:- use_module("../prolog/declaration").
 
 setup :-
     % Some type declarations
@@ -28,7 +28,7 @@ test(setup_cleanup) :-
     retract_all_types_and_aliases,
     setup.
 
-test(var, [Var == \Type]) :-
+test(var, [Var == cata_escape(Type)]) :-
     typecheck(Var, Type).
 
 test(incomplete_list, [Type =@= list(list(_))]) :-
@@ -46,10 +46,10 @@ test(whole_program, [Type == (nat, (nat     :- nat ), even,      (even          
 test(typecheck_fail_propagates, [E =@= ill_typed(expected_type(list(_)),got(nat))]) :-
     catch_error(typecheck([even([])], _), E).
 
-test(var_preservation, [error(determinism_error(vars_preserved(f(_), potato), det, fail, goal), _)]) :-
+test(var_preservation, [error(ill_typed(vars_not_preserved(f(_), potato)), _)]) :-
     type potato ---> f(_).
 
-test(ctor_already_declared, [error(determinism_error(\+declared_ctor(z), det, fail, goal), _)]) :-
+test(ctor_already_declared, [error(ill_typed(already_declared_ctor(z)), _)]) :-
     type letter ---> z.
 
 test(var_type, [Type == abcd(X,Y,Z)]) :-
@@ -58,7 +58,7 @@ test(var_type, [Type == abcd(X,Y,Z)]) :-
 test(var_ctor, [error(determinism_error(nonvar(_), det, fail, goal), _)]) :-
     (type potato ---> _).
 
-test(alias_unpreserved_var, [error(determinism_error(vars_preserved(_,_), det, fail, goal), _)]) :-
+test(alias_unpreserved_var, [error(ill_typed(vars_not_preserved(thread_ret(_,X),st(X))), _)]) :-
     type st(X) ---> thread_ret(_Thread, X).
 
 test(var_alias_lhs, [error(determinism_error(nonvar(_), det, fail, goal), _)]) :-
@@ -78,16 +78,22 @@ test(arity_overloaded_type) :-
     % Overloading is already disallowed for term ctors so that currying always unambiguous.
     type nat(X) ---> new_nat(X).
 
-test(type_as_term, [error(determinism_error(\+declared_type(nat), det, fail, goal), _)]) :-
+test(type_as_term, [error(ill_typed(already_declared_type(nat)), _)]) :-
     typecheck([nat], _).
 
-test(type_as_ctor, [error(determinism_error(\+declared_type(nat), det, fail, goal), _)]) :-
+test(type_as_ctor, [error(ill_typed(already_declared_type(nat)), _)]) :-
     type _ ---> nat.
 
-test(disallowed_type_functor, [error(determinism_error(allowed_functor(_->_), det, fail, goal), _)]) :-
+test(ctor_as_type, [error(ill_typed(already_declared_ctor(z)), _)]) :-
+    type z ---> blabla.
+
+test(reusing_ctor, [error(ill_typed(already_declared_ctor(z)), _)]) :-
+    type blablabla ---> z.
+
+test(disallowed_ctor_functor, [error(ill_typed(illegal_functor(_->_)), _)]) :-
     type arrow(A, B) ---> (A -> B).
 
-test(disallowed_ctor_functor, [error(determinism_error(allowed_functor(_->_), det, fail, goal), _)]) :-
+test(disallowed_type_functor, [error(ill_typed(illegal_functor(_->_)), _)]) :-
     type (A -> B) ---> arrow(A, B).
 
 test(unification_success, [Type == refl(nat)]) :-
@@ -99,7 +105,7 @@ test(unification_failure, [E =@= ill_typed(expected_type(list(_)),got(nat))]) :-
 test(unification_skolem_success, [Type == refl(f)]) :-
     typecheck(f = f, Type).
 
-test(annotated_skolem_success, [X-Y-Type =@= (\T)-(\T)-list(f(T))]) :-
+test(annotated_skolem_success, [X-Y-Type =@= cata_escape(T)-cata_escape(T)-list(f(T))]) :-
     typecheck([f(X), f(Y)], Type).
 
 test(unification_skolem_failure, [E =@= ill_typed(expected_type(list(_)),got(nat))]) :-
@@ -156,14 +162,14 @@ test(mutually_recursive_types, [Type == mutrecA]) :-
     RecTerm = mutrecA(mutrecB(RecTerm)),
     typecheck(RecTerm, Type).
 
-test(empty_alias) :-
-    % TODO: This is not necessarily desirable.
-    (type empty == empty),
-    (type also_empty == empty),
-    (type abcdefg == hijklmnop),
-    typecheck(_, empty).
+test(ctor_of_undeclared) :-
+    % This is to allow mutually recursive types.
+    type blabla ---> list(undeclared).
 
-test(union_alias, [error(determinism_error(\+declared_type(alias), det, fail, goal), _)]) :-
+test(alias_undeclared, [error(ill_typed(undeclared_type(undeclared)), _)]) :-
+    type undeclareds == list(undeclared).
+
+test(union_alias, [error(ill_typed(already_declared_type(alias)), _)]) :-
     (type alias == nat),
     (type alias == list(nat)).
 
