@@ -1,5 +1,5 @@
 name(perfunctory_types).
-version('0.1').
+version('0.2').
 title('Per-functor, static, polymorphic types').
 keywords([types]).
 author('Geoffrey Churchill', 'geoffrey.a.churchill@gmail.com').
