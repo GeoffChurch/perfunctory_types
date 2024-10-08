@@ -108,8 +108,14 @@ test(unification_skolem_success, [Type == refl(f)]) :-
 test(annotated_skolem_success, [X-Y-Type =@= cata_escape(T)-cata_escape(T)-list(f(T))]) :-
     typecheck([f(X), f(Y)], Type).
 
-test(unification_skolem_failure, [E =@= ill_typed(expected_type(list(_)),got(nat))]) :-
+test(unification_skolem_over_different_types, [E =@= ill_typed(expected_type(list(_)),got(nat))]) :-
     catch_error(typecheck(f(z) = f([]), _), E).
+
+test(unification_different_skolems, [E =@= ill_typed(expected_type(apple),got_untyped_term(orange))]) :-
+    catch_error(typecheck(apple = orange, _), E).
+
+test(unification_existing_with_skolem, [E =@= ill_typed(expected_type(list(_)),got(apple))]) :-
+    catch_error(typecheck(f(apple) = f([]), _), E).
 
 test(annotated_skolem_failure, [E =@= ill_typed(expected_type(list(_)),got(nat))]) :-
     catch_error(typecheck([f(z), f([])], _), E).
