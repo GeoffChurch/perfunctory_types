@@ -1,4 +1,4 @@
-:- use_module("../../../prolog/typecheck_syntactic").
+:- use_module(library(perfunctory_types)).
 
 :- (type T ---> a ; b), % T has two constructors, a and b.
    (type _ ---> p(T)). % p/1 demands an argument of type T, i.e. a or b.

@@ -1,4 +1,4 @@
-:- use_module("../prolog/declaration").
+:- use_module(library(perfunctory_types/declaration)).
 
 setup :-
     % Some type declarations

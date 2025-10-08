@@ -1,6 +1,6 @@
 :- module(typecheck_syntactic, []).
 
-:- reexport("declaration").
+:- reexport(library(perfunctory_types/declaration)).
 
 :- dynamic term_to_check/1.
 

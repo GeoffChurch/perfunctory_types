@@ -128,8 +128,7 @@ Some options are:
 ## Testing
 
 ```shell
-$ cd t/
-$ swipl -g "consult('*.plt'), run_tests" -t halt
+$ swipl -g "consult('t/*.plt'), run_tests" -t halt
 ```
 
 ---
