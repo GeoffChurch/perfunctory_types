@@ -1,6 +1,6 @@
 :- module(check, [typecheck/4]).
 
-:- use_module(util, [cata/3, cyclesafe_type/4, dealias/3,
+:- use_module(library(perfunctory_types/util), [cata/3, cyclesafe_type/4, dealias/3,
 		     must_be_undeclared_type/3]).
 
 :- use_module(library(lists), [append/3]).
@@ -14,30 +14,30 @@ typecheck(Types, Aliases, Term, Type) :-
 	  throw(error(ill_typed(expected_type(T), got_type(PT)),
 		      Ctx))).
 
-typecheck_(Types, Als, PreType, Type) =>
+typecheck_(Types, Aliases, PreType, Type) =>
     % Try to look up the "full" type (if PreType is a function type
     % then Type is too).
     functor(PreType, Ctor, _),
     cyclesafe_type(Types, Ctor, FullPreType, FullType)
     *-> % Resolve Type to FullType, possibly prefixed with arrows if
-	% missing arguments.
-	$(matchargs(PreType, Type, FullPreType, FullType))
+	    % missing arguments.
+        $(matchargs(PreType, Type, FullPreType, FullType))
     ;   % Otherwise, do an ad-hoc type declaration/skolemization.
-	% This is similar to having declared `same_functor(PreType,
-	% Skel), (type Skel ---> Skel)` ahead of time, so that PreType
-	% is polymorphic in all arguments and has a unique type (the
-	% difference is that an explicit declaration would constrain
-	% the arity). In other words, the ambient algebra is left free
-	% except where it has been explicitly coalesced by declaring
-	% types with multiple ctors.
+        % This is similar to having declared `same_functor(PreType,
+        % Skel), (type Skel ---> Skel)` ahead of time, so that PreType
+        % is polymorphic in all arguments and has a unique type (the
+        % difference is that an explicit declaration would constrain
+        % the arity). In other words, the ambient algebra is left free
+        % except where it has been explicitly coalesced by declaring
+        % types with multiple ctors.
 
         % Block skolemization when the term is a type, so that we
         % can't inject into a type with the same functor as PreType.
-        must_be_undeclared_type(Types, Als, PreType),
+        must_be_undeclared_type(Types, Aliases, PreType),
         (Type = PreType % Skolemize.
-	-> true
-	;  throw(error(ill_typed(expected_type(Type),
-				 got_untyped_term(PreType)), _))).
+        -> true
+        ;  throw(error(ill_typed(expected_type(Type),
+                                 got_untyped_term(PreType)), _))).
 
 matchargs(PartTerm, PartType, FullTerm, FullType) :-
     $(PartTerm =.. [F|PartArgs]),

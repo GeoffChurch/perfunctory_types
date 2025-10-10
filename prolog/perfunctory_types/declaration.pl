@@ -8,8 +8,8 @@
 	      retract_all_types_and_aliases/0
 	  ]).
 
-:- use_module(check).
-:- use_module(util).
+:- use_module(library(perfunctory_types/check)).
+:- use_module(library(perfunctory_types/util)).
 
 :- use_module(library(apply), [maplist/4, foldl/4, maplist/2]).
 :- use_module(library(assoc), [get_assoc/3, list_to_assoc/2]).
@@ -108,26 +108,26 @@ cyclesafe_assert_type(Ctor, PreType, Type) :-
     term_factorization(PreType, PTF),
     assertz(ctor_pretype_type(Ctor, PTF, Type)).
 
-get_type(Ctor-pretype_type(PreType, Type)) :-
+get_type(Ctor, pretype_type(PreType, Type)) :-
     ctor_pretype_type(Ctor, PTF, Type),
     term_factorization(PreType, PTF).
 
 :- det(get_types/1).
 get_types(Types) :-
-    $(findall(Type, get_type(Type), Types_)),
+    $(findall(Ctor-TypeRule, get_type(Ctor, TypeRule), Types_)),
     $(list_to_assoc(Types_, Types)).
 
 cyclesafe_assert_alias_canonical(A, C) :-
     term_factorization(C, Factorization),
     assertz(alias_canonical(A, Factorization)).
 
-get_alias(A-C) :-
+get_alias(A, C) :-
     alias_canonical(A, F),
     term_factorization(C, F).
 
 :- det(get_aliases/1).
 get_aliases(Als) :-
-    $(findall(A, get_alias(A), Als_)),
+    $(findall(A-C, get_alias(A, C), Als_)),
     $(list_to_assoc(Als_, Als)).
 
 current_ctor(Name, Arity, Type) :-
