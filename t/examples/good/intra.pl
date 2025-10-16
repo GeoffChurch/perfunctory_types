@@ -6,4 +6,4 @@
 
 p(a).
 p(b).
-p(X) :- X = c. % Ill-typed, due to the declarations for p/1 and (=)/2.
+p(X) :- X = b.

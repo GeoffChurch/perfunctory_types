@@ -2,22 +2,38 @@
 
 `perfunctory_types` is a static type system for SWI-Prolog.
 
-It might be bugged or at least irreparably flawed. Feedback is very welcome!
+There might be bugs. Feedback is welcome!
 
 See [the tests](t/) for lots of examples.
 
 ## Overview
 
-The basic idea is that type declarations constrain and coalesce the ambient "term algebra" into a "type algebra".
+There is a syntactic and a semantic side to the type system. The semantic side builds on top of the syntactic side.
 
-The algebra is constrained into a subalgebra by constraining the types of a constructor's arguments.
+### Syntactic checking
 
-The algebra is coalesced into a quotient algebra by declaring types with multiple constructors.
+The basic idea is that type declarations _constrain_ and _coalesce_ the ambient "term algebra" (the Herbrand algebra) into a "type algebra".
 
-Typechecking amounts to checking that a term is a member of the algebra induced by the type constraints.
+The algebra is _constrained_ into a subalgebra by constraining the types of a constructor's arguments.
 
+The algebra is _coalesced_ into a quotient algebra by declaring types with multiple constructors.
 
-## Salient aspects
+Syntactic typechecking amounts to checking that a term is a member of the algebra induced by the type declarations.
+
+### Semantic checking
+
+Prolog's semantics are handled by inferring a conservative (GLB) type for each untyped predicate, and checking that each usage of the predicate conforms to the inferred type. The inference is implemented by simply unifying the types of the heads of all clauses for a given predicate, where each clause is syntactically typechecked in isolation. The checking is implemented by constraining each usage to be subsumed by the inferred type, using library(subsumes) for pure/relational subsumption. 
+
+For example, the following is ill-typed because color and list(_) cannot be unified:
+```prolog
+:- type color --> r ; g ; b.
+:- type list(X) ---> [] ; [X|list(X)].
+
+p(red).
+p([]).
+```
+
+## Key features
 
 ### Gradual typing
 
@@ -25,7 +41,7 @@ The algebra is left free except where explicitly coalesced/constrained by type d
 
 ```prolog
 ?- typecheck(f(x), Type).
-Type = f(x).
+Type = f(x). % x/0 and f/1 are "skolemized" so that type(x) = x and type(f(A)) = f(A).
 ```
 
 ### Parametric polymorphism
@@ -91,25 +107,17 @@ true.
 
 This is an implementation-friendly consequence of type preservation. So (anyway questionable) entities like [`ST`](https://wiki.haskell.org/Monad/ST) are prohibited.
 
-### No distinction between predicates and other terms
-
-Typechecking is applied to terms, which may be entire programs. Types are "per-functor-y".
-
 ### Syntax is similar to that of the very different [`type_check`](https://www.swi-prolog.org/pack/list?p=type_check) pack.
 
 ---
 
 ## TODOs
 
-### Semantic checking
-
-Right now, type checking is "syntactic" in that it applies to terms and is completely unaware of predicates. More powerful semantic checking will be added soon, and will amount to inferring the type of a predicate's head functor as the unification of its per-clause head types.
-
 ### Higher-kinded types
 
 There don't appear to be any technical blockers. Hopefully the [`hilog`](https://us.swi-prolog.org/pack/list?p=hilog) pack can do the heavy-lifting.
 
-### Tooling integration
+### Tooling integration aka red squigglies
 
 Some options are:
 
@@ -128,7 +136,7 @@ Some options are:
 ## Testing
 
 ```shell
-$ swipl -g "consult('t/*.plt'), run_tests" -t halt
+for file in t/*.plt; do swipl -g "consult('$file'), run_tests" -t halt; done
 ```
 
 ---
