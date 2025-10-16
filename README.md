@@ -26,7 +26,7 @@ Prolog's semantics are handled by inferring a conservative (GLB) type for each u
 
 For example, the following is ill-typed because color and list(_) cannot be unified:
 ```prolog
-:- type color --> r ; g ; b.
+:- type color --> red ; green ; blue.
 :- type list(X) ---> [] ; [X|list(X)].
 
 p(red).
