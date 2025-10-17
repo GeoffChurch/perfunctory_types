@@ -22,9 +22,9 @@ Syntactic typechecking amounts to checking that a term is a member of the algebr
 
 ### Semantic checking
 
-Prolog's semantics are handled by inferring a conservative (GLB) type for each untyped predicate, and checking that each usage of the predicate conforms to the inferred type. The inference is implemented by simply unifying the types of the heads of all clauses for a given predicate, where each clause is syntactically typechecked in isolation. The checking is implemented by constraining each usage to be subsumed by the inferred type, using library(subsumes) for pure/relational subsumption. 
+Prolog's semantics are handled by inferring a type for each untyped predicate, and checking that each usage of the predicate conforms to the inferred type. If all predicates already have syntactic type declarations, then syntactic checking already suffices and there is no need for explicit semantic checking. Inference is implemented by unifying the types of the heads of all clauses for a given predicate, where each clause is syntactically typechecked in isolation. Checking is implemented by constraining each usage to be subsumed by the inferred type, using library(subsumes) for pure/relational subsumption. 
 
-For example, the following is ill-typed because color and list(_) cannot be unified:
+For example, the following is ill-typed because `color` and `list(_)` cannot be unified:
 ```prolog
 :- use_module(library(perfunctory_types)).
 
@@ -37,7 +37,7 @@ p([]).
 
 ## Key features
 
-### Gradual typing
+### Skolemization
 
 The algebra is left free except where explicitly coalesced/constrained by type declarations.
 

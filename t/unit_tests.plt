@@ -1,4 +1,4 @@
-:- use_module(library(perfunctory_types/declaration)).
+:- use_module(library(perfunctory_types/exports)).
 
 setup :-
     % Some type declarations

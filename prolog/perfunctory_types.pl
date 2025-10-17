@@ -1,6 +1,6 @@
 :- module(perfunctory_types, []).
 
-:- reexport(library(perfunctory_types/declaration)).
+:- reexport(library(perfunctory_types/exports)).
 
 :- dynamic term_to_check/1.
 
@@ -23,7 +23,7 @@ unwanted_term(begin_of_file).
 unwanted_term(:- _).
 
 check_and_infer(Infers, Term, Type) :-
-    $(declaration:typecheck(Infers, Term, Type)),
+    $(typecheck(Infers, Term, Type)),
     % Unify rule's head type with predicate's inferred type.
     $(rule_head(Term, Head)),
     $(term_functor(Head, F)),
@@ -33,7 +33,6 @@ check_and_infer(Infers, Term, Type) :-
     -> true
     ;  throw(error(ill_typed(failed_unification(HeadType_ = HeadType)), _))
     ).
-
 
 user:term_expansion(end_of_file, []) :-
     % Collect stored terms

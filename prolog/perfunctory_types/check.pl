@@ -1,5 +1,6 @@
-:- module(check, [typecheck/5]).
+:- module(check, [typecheck/2, typecheck/3]).
 
+:- use_module(library(perfunctory_types/db), [get_types/1, get_aliases/1]).
 :- use_module(library(perfunctory_types/util), [cata/3, cyclesafe_type/4, dealias/3,
 		     must_be_undeclared_type/3]).
 
@@ -11,6 +12,15 @@ predcheck(Infers, Ctor, TermType) :-
     get_assoc(Ctor, Infers, PredType)
     -> subsumes(PredType, TermType)
     ;  true.
+
+typecheck(Term, Type) :-
+    $(empty_assoc(Infers)),
+    typecheck(Infers, Term, Type).
+
+typecheck(Infers, Term, Type) :-
+    $(get_types(Types)),
+    $(get_aliases(Aliases)),
+    $(typecheck(Types, Aliases, Infers, Term, Type)).
 
 typecheck(Types, Aliases, Infers, Term, Type) :-
     $(dealias(Aliases, Type, CanonicalType)),

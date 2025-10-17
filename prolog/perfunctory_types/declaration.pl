@@ -2,8 +2,6 @@
 	      op(1150,  fx, type),
 	      op(1130, xfx, --->),
 	      (type)/1,
-	      typecheck/2,
-          typecheck/3,
 	      current_ctor/3,
 	      retract_ctor/3,
 	      retract_all_types_and_aliases/0
@@ -60,15 +58,6 @@ type A == B =>
     $(vars_preserved(B, A)),
     $(dealias(Als, B, C)), % Path compression.
     $(cyclesafe_assert_alias_canonical(A, C)).
-
-typecheck(Term, Type) :-
-    $(empty_assoc(Infers)),
-    typecheck(Infers, Term, Type).
-
-typecheck(Infers, Term, Type) :-
-    $(get_types(Types)),
-    $(get_aliases(Aliases)),
-    $(check:typecheck(Types, Aliases, Infers, Term, Type)).
 
 assert_type(Types, Als, Type, PreType) :-
     $(allowed_functor(PreType)),
